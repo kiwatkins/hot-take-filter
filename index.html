@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hot Take Filter</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hot Take">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    --bg: #f2f2f7; --card: #ffffff; --text: #1c1c1e; --hint: #6c6c70; --line: #d1d1d6;
+    --accent: #e8552f; --accent-text: #ffffff; --cool: #2e7d32; --warm: #b26a00; --hot: #c62828; --vhot: #8e0000;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000; --card: #1c1c1e; --text: #f2f2f7; --hint: #98989f; --line: #38383a;
+      --accent: #ff6a45; --cool: #66bb6a; --warm: #ffb74d; --hot: #ef5350; --vhot: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    -webkit-text-size-adjust: 100%; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--bg);
+    padding: calc(env(safe-area-inset-top) + 12px) 20px 10px; }
+  .title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: .02em; }
+  .tagline { color: var(--hint); font-size: 14px; margin: 2px 0 0; }
+  .step-name { font-weight: 700; margin: 12px 0 6px; }
+  .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: linear-gradient(90deg, #ff5c36, #2880d6);
+    transition: width .25s; }
+  main { padding: 4px 20px calc(env(safe-area-inset-bottom) + 96px); max-width: 680px; margin: 0 auto; }
+  .card { background: var(--card); border-radius: 14px; padding: 14px 16px; margin: 12px 0; }
+  label.q { display: block; font-weight: 600; }
+  .hint { color: var(--hint); font-size: 14px; margin: 2px 0 0; }
+  input[type=text], textarea {
+    width: 100%; margin-top: 8px; padding: 10px 12px; font: inherit; color: var(--text);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px; resize: vertical; }
+  textarea { min-height: 5.5em; }
+  textarea.tall { min-height: 9em; }
+  textarea.brief { min-height: 22em; font-size: 15px; }
+  input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .check { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+  .check input { width: 22px; height: 22px; accent-color: var(--accent); margin: 0; }
+  .heat-level { font-weight: 700; }
+  ul.flags, ul.tips { margin: 6px 0 0; padding-left: 20px; font-size: 14px; color: var(--hint); }
+  ul.flags li, ul.tips li { margin: 3px 0; }
+  nav.bottom { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; gap: 12px;
+    padding: 12px 20px calc(env(safe-area-inset-bottom) + 12px);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-top: 1px solid var(--line); }
+  button { font: inherit; border: 0; border-radius: 12px; padding: 13px 18px; cursor: pointer;
+    background: var(--card); color: var(--text); -webkit-tap-highlight-color: transparent; }
+  button.primary { background: var(--accent); color: var(--accent-text); font-weight: 600; flex: 1; }
+  button:disabled { opacity: .4; }
+  button.link { background: none; color: var(--accent); padding: 6px 0; font-size: 15px; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .actions button.wide { grid-column: 1 / -1; }
+  .status { color: var(--hint); font-size: 14px; min-height: 1.4em; margin-top: 10px; }
+  .saved-item { display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 10px 0; border-top: 1px solid var(--line); }
+  .saved-item:first-child { border-top: 0; }
+  .saved-item small { color: var(--hint); display: block; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="title-row">
+    <div>
+      <h1>HOT TAKE FILTER</h1>
+      <p class="tagline">Answer in rough fragments. At the end you'll get a brief to paste into Claude.</p>
+    </div>
+    <button class="link" id="savedBtn">Saved</button>
+  </div>
+  <div class="step-name" id="stepName"></div>
+  <div class="bar"><div id="bar"></div></div>
+</header>
+
+<main id="main"></main>
+
+<nav class="bottom">
+  <button id="backBtn">Back</button>
+  <button class="primary" id="nextBtn">Next</button>
+</nav>
+
+<script>
+// ---------- content (kept in step with hot_take_filter.py) ----------
+
+const LOADED_PHRASES = [
+  [/at the knees/gi, "Metaphor for harm. Say what specifically gets weakened and how."],
+  [/\bundermin\w*/gi, "Name the specific thing that is weakened, not the verb."],
+  [/\bnobody\b|\bno one\b/gi, "Absolute. Who specifically? Try 'some teams' or 'in this case'."],
+  [/\beveryone\b|\beverybody\b/gi, "Absolute. Try 'several people' or name the group."],
+  [/\balways\b/gi, "Absolute. Try 'often' or 'in the last few cases'."],
+  [/\bnever\b/gi, "Absolute. Fine if it's a literal fact; otherwise try 'hasn't yet'."],
+  [/\bbroken\b/gi, "Vague. Say what isn't working and how you know."],
+  [/\bdisregard\w*|\bignor\w*/gi, "Assumes intent. Consider 'the message didn't reach them'."],
+  [/\bperfect example\b/gi, "Sounds like you were waiting to be proven right. Just state the example."],
+  [/\bobviously\b|\bclearly\b/gi, "Tells the listener they're slow if they disagree. Cut it."],
+  [/\bmess\b|\bridiculous\b|\bterrible\b|\bstupid\b|\bidiot\w*/gi,
+   "Judgment word. Replace with the observable problem."],
+  [/\bvociferous\w*|\bfurious\b|\bangry\b|\boutrage\w*/gi,
+   "Names your temperature, not the issue. Save it for venting."],
+  [/\bthey (always|never|just|only)\b/gi, "Generalizes about people. Describe the behavior once, specifically."],
+];
+
+const CHANNELS = {
+  "1": ["Slack / chat message", "a short Slack-style message"],
+  "2": ["Email", "an email with a subject line"],
+  "3": ["Say it out loud", "a spoken script I can say in a meeting, in natural spoken sentences"],
+  "4": ["Written and spoken", "both a short written message and a spoken script"],
+};
+
+const AUDIENCE_CURRENCIES = {
+  "1": ["Logic / data", "Lead with the facts and the risk. Keep feelings out of it."],
+  "2": ["Feelings / relationships", "Open by acknowledging effort and good intent before the facts."],
+  "3": ["Precedent / consistency", "Frame it as what this decision sets up for next time."],
+  "4": ["Risk / cost", "Frame it as the cost of rework versus the cost of a short check now."],
+  "5": ["Authority / hierarchy", "Tie it to a stated priority or guiding principle they already own."],
+};
+
+// Each step is a list of fields. kind: line | text | list | checks
+const STEPS = [
+  { name: "Step 1 of 5: Background and feelings", fields: [
+    { id: "topic", kind: "line", q: "In a few words, what is this about?" },
+    { id: "context", kind: "text", tall: true, q: "BACKGROUND: what's the history?",
+      hint: "Who's involved, what led up to this, anything that explains why it's sticky. Don't worry about order." },
+    { id: "feelings", kind: "text", tall: true, heat: true, q: "THOUGHTS AND FEELINGS: how are you thinking and feeling about it?",
+      hint: "Messy is fine. This is private. It's here so Claude can tell what's emotion and what's a usable concern." },
+    { id: "worst_read", kind: "text", q: "HOW COULD THIS BE MISREAD?",
+      hint: "Who might take it as personal, political, or a power play, and what could get you in trouble? Leave blank to skip." },
+  ]},
+  { name: "Step 2 of 5: Facts vs. interpretation", fields: [
+    { id: "facts", kind: "list", q: "FACTS: what happened that someone else would also have seen or could verify?",
+      hint: "One per line. Fragments are fine." },
+    { id: "interpretations", kind: "list", q: "INTERPRETATIONS: what are you assuming about motives, intent, or meaning?",
+      hint: "One per line. Fragments are fine." },
+  ]},
+  { name: "Step 3 of 5: Audience", fields: [
+    { id: "audience", kind: "line", q: "Who will hear this first?", hint: "A team, one person, leadership…" },
+    { id: "channels", kind: "checks", options: CHANNELS, q: "How will you deliver it?" },
+    { id: "picks", kind: "checks", options: AUDIENCE_CURRENCIES, tips: true, q: "What does this audience respond to most?" },
+    { id: "watch_outs", kind: "line", q: "Anything that will make them defensive?", hint: "A sensitivity, a history, a title." },
+    { id: "good_intent", kind: "line", q: "What is genuinely good about their position?", hint: "Leave blank to skip." },
+  ]},
+  { name: "Step 4 of 5: Structure", fields: [
+    { id: "structural", kind: "text", q: "Take yourself out of the story. What is the systemic issue underneath?" },
+    { id: "precedent", kind: "text", q: "What does this set up for next time if nothing changes?" },
+  ]},
+  { name: "Step 5 of 5: The ask", fields: [
+    { id: "ask", kind: "text", q: "What do you want to happen next?",
+      hint: "Specific, and something they can say yes to without losing face." },
+  ]},
+];
+const BRIEF_STEP = STEPS.length;
+const SAVED_STEP = STEPS.length + 1;
+
+// ---------- analysis (ported from hot_take_filter.py) ----------
+
+function heatCheck(text) {
+  const hits = [], seen = new Set();
+  for (const [pattern, advice] of LOADED_PHRASES) {
+    for (const m of text.matchAll(pattern)) {
+      const key = m[0].toLowerCase();
+      if (!seen.has(key)) { seen.add(key); hits.push([m[0], advice]); }
+    }
+  }
+  return hits;
+}
+
+function heatLevel(n) {
+  if (n === 0) return "Cool";
+  if (n <= 2) return "Warm";
+  if (n <= 5) return "Hot";
+  return "Very hot: sleep on it before sending";
+}
+
+const bullets = items => items.length ? items.map(x => `- ${x}`).join("\n") : "(none given)";
+const orNone = text => text ? text : "(none given)";
+
+function buildBrief(d) {
+  const channelAsks = d.channels.map(c => CHANNELS[c][1]);
+  const channelLabels = d.channels.map(c => CHANNELS[c][0]);
+  const delivery = d.picks.map(p => `${AUDIENCE_CURRENCIES[p][0]}: ${AUDIENCE_CURRENCIES[p][1]}`);
+  const flags = d.hits.length ? d.hits.map(([p, a]) => `- "${p}": ${a}`).join("\n") : "(nothing flagged)";
+
+  return `I'm about to raise something at work and want help turning my raw reaction into a message I can actually send. My notes below are rough on purpose, and some of them are feelings rather than facts. Please do the wording, and make it sound like me: plain, conversational, calm, not a memo.
+
+TOPIC
+${orNone(d.topic)}
+
+WHO I'M SAYING IT TO, AND WHERE
+${orNone(d.audience)} (${channelLabels.join(", ")})
+
+BACKGROUND AND CONTEXT
+${orNone(d.context)}
+
+MY THOUGHTS AND FEELINGS (private; help me sort what's emotion from what's a legitimate workplace concern, and don't echo this tone back)
+${orNone(d.feelings)}
+Loaded language already flagged in it:
+${flags}
+
+HOW THIS COULD BE MISREAD (where I'm worried it could land badly or get me in trouble)
+${orNone(d.worst_read)}
+
+FACTS (state these plainly)
+${bullets(d.facts)}
+
+MY INTERPRETATIONS (my assumptions about motives or meaning; keep out of the message unless you can turn one into a genuine question)
+${bullets(d.interpretations)}
+
+WHAT THIS AUDIENCE RESPONDS TO
+${bullets(delivery)}
+
+WHAT MIGHT MAKE THEM DEFENSIVE
+${orNone(d.watch_outs)}
+
+WHAT'S GENUINELY GOOD ABOUT THEIR POSITION (acknowledge this early)
+${orNone(d.good_intent)}
+
+THE SYSTEMIC ISSUE UNDERNEATH (separate from how it affects me personally)
+${orNone(d.structural)}
+
+WHAT THIS SETS UP FOR NEXT TIME IF NOTHING CHANGES
+${orNone(d.precedent)}
+
+WHAT I WANT TO HAPPEN NEXT
+${orNone(d.ask)}
+
+WHAT I WANT BACK
+1. First, briefly separate what's emotion from what's a legitimate workplace concern in my notes, so I can see the difference.
+2. Then ${channelAsks.join(" and ")}, in my voice, as concise as you can make it while keeping the key points.
+3. The ask should be something they can say yes to without losing face. Frame it as a shared check or question rather than a demand if that fits.
+4. Tell me if anything in my notes or your draft sounds like I'm assuming someone's intent, and flag any phrasing that could get me in trouble given the background and how it could be misread.
+5. If something important is missing, ask me one question before writing. Otherwise, just write it.
+`;
+}
+
+// ---------- state (kept on this device only) ----------
+
+const ANSWERS_KEY = "htf.answers", SAVED_KEY = "htf.saved";
+const load = (k, fallback) => { try { return JSON.parse(localStorage.getItem(k)) ?? fallback; } catch { return fallback; } };
+let answers = load(ANSWERS_KEY, {});
+let saved = load(SAVED_KEY, []);
+let step = answers._step ?? 0;
+let briefText = "";
+let lastStep = 0;
+
+function persist() {
+  answers._step = step < BRIEF_STEP ? step : BRIEF_STEP - 1;
+  localStorage.setItem(ANSWERS_KEY, JSON.stringify(answers));
+}
+
+function picksFor(id) {
+  const v = answers[id];
+  return Array.isArray(v) && v.length ? v : ["1"];
+}
+
+function collect() {
+  const s = id => (answers[id] || "").trim();
+  const lines = id => s(id).split("\n").map(x => x.trim()).filter(Boolean);
+  return {
+    topic: s("topic"), context: s("context"), feelings: s("feelings"), worst_read: s("worst_read"),
+    hits: heatCheck(s("feelings")), facts: lines("facts"), interpretations: lines("interpretations"),
+    audience: s("audience"), channels: picksFor("channels"), picks: picksFor("picks"),
+    watch_outs: s("watch_outs"), good_intent: s("good_intent"), structural: s("structural"),
+    precedent: s("precedent"), ask: s("ask"),
+  };
+}
+
+// ---------- rendering ----------
+
+const main = document.getElementById("main");
+const el = (tag, props = {}, ...kids) => {
+  const n = Object.assign(document.createElement(tag), props);
+  for (const k of kids) n.append(k);
+  return n;
+};
+
+function heatPanel(text) {
+  const box = el("div");
+  const hits = heatCheck(text);
+  const level = heatLevel(hits.length);
+  const color = { Cool: "--cool", Warm: "--warm", Hot: "--hot" }[level] || "--vhot";
+  const head = el("p", { className: "heat-level", textContent: `Heat check: ${level}` });
+  head.style.color = `var(${color})`;
+  head.style.margin = "10px 0 0";
+  box.append(head);
+  if (hits.length) {
+    box.append(el("ul", { className: "flags" }, ...hits.map(([p, a]) => el("li", { textContent: `“${p}”: ${a}` }))));
+  } else {
+    box.append(el("p", { className: "hint", textContent: text.trim()
+      ? "Nothing flagged. Your instinct may already be calmer than you think."
+      : "Updates as you type." }));
+  }
+  return box;
+}
+
+function tipsList() {
+  return el("ul", { className: "tips" }, ...picksFor("picks").map(k =>
+    el("li", { textContent: `${AUDIENCE_CURRENCIES[k][0]}: ${AUDIENCE_CURRENCIES[k][1]}` })));
+}
+
+function renderField(f) {
+  const card = el("div", { className: "card" });
+  const fid = `f-${f.id}`;
+  card.append(el("label", { className: "q", htmlFor: fid, textContent: f.q }));
+  if (f.hint) card.append(el("p", { className: "hint", textContent: f.hint }));
+
+  if (f.kind === "checks") {
+    const current = picksFor(f.id);
+    let tips;
+    for (const [key, [label]] of Object.entries(f.options)) {
+      const box = el("input", { type: "checkbox", checked: current.includes(key) });
+      box.addEventListener("change", () => {
+        const set = new Set(Array.isArray(answers[f.id]) ? answers[f.id] : ["1"]);
+        box.checked ? set.add(key) : set.delete(key);
+        answers[f.id] = [...set].sort();
+        persist();
+        if (tips) tips.replaceWith(tips = tipsList());
+      });
+      card.append(el("label", { className: "check" }, box, label));
+    }
+    if (f.tips) card.append(tips = tipsList());
+    return card;
+  }
+
+  const input = f.kind === "line"
+    ? el("input", { type: "text", id: fid, enterKeyHint: "next", autocapitalize: "sentences" })
+    : el("textarea", { id: fid, className: f.tall ? "tall" : "", autocapitalize: "sentences" });
+  input.value = answers[f.id] || "";
+  card.append(input);
+  let heat;
+  if (f.heat) card.append(heat = heatPanel(input.value));
+  input.addEventListener("input", () => {
+    answers[f.id] = input.value;
+    persist();
+    if (heat) heat.replaceWith(heat = heatPanel(input.value));
+  });
+  return card;
+}
+
+function renderBrief() {
+  const card = el("div", { className: "card" });
+  card.append(el("label", { className: "q", htmlFor: "brief", textContent: "Here's your brief." }));
+  card.append(el("p", { className: "hint", textContent: "Copy it, then paste it into a new Claude chat. You can tweak it here first." }));
+  const area = el("textarea", { id: "brief", className: "brief", value: briefText });
+  area.addEventListener("input", () => { briefText = area.value; });
+  card.append(area);
+
+  const status = el("p", { className: "status", role: "status" });
+  const copyBtn = el("button", { className: "primary", textContent: "Copy brief" });
+  copyBtn.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(briefText); status.textContent = "Copied. Now open Claude and paste."; }
+    catch { area.select(); status.textContent = "Couldn't copy automatically. The text is selected; tap Copy."; }
+  });
+  const claudeBtn = el("button", { textContent: "Open Claude" });
+  claudeBtn.addEventListener("click", () => window.open("https://claude.ai/new", "_blank"));
+  const actions = el("div", { className: "actions" }, copyBtn, claudeBtn);
+  if (navigator.share) {
+    const shareBtn = el("button", { className: "wide", textContent: "Share or save to Files…" });
+    shareBtn.addEventListener("click", () => navigator.share({ title: "Hot take brief", text: briefText }).catch(() => {}));
+    actions.append(shareBtn);
+  }
+  const resetBtn = el("button", { className: "wide", textContent: "Start a new hot take" });
+  resetBtn.addEventListener("click", startOver);
+  actions.append(resetBtn);
+  card.append(actions, status);
+  main.append(card);
+  main.append(el("p", { className: "hint", textContent:
+    "Tip: when Claude replies, read the draft out loud once. Rewrite anything that makes your jaw tighten." }));
+}
+
+function renderSaved() {
+  const card = el("div", { className: "card" });
+  if (!saved.length) {
+    card.append(el("p", { className: "hint", textContent: "No saved briefs yet. Each brief you build is kept here, on this device only." }));
+  }
+  saved.forEach((item, i) => {
+    const open = el("button", { className: "link", textContent: "Open" });
+    open.addEventListener("click", () => { briefText = item.brief; go(BRIEF_STEP); });
+    const del = el("button", { className: "link", textContent: "Delete" });
+    del.addEventListener("click", () => {
+      if (!confirm(`Delete the brief "${item.topic}"?`)) return;
+      saved.splice(i, 1);
+      localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
+      render();
+    });
+    card.append(el("div", { className: "saved-item" },
+      el("div", {}, el("strong", { textContent: item.topic }), el("small", { textContent: item.date })),
+      el("div", {}, open, document.createTextNode("  "), del)));
+  });
+  main.append(card);
+}
+
+const backBtn = document.getElementById("backBtn");
+const nextBtn = document.getElementById("nextBtn");
+
+function render() {
+  main.replaceChildren();
+  const names = [...STEPS.map(s => s.name), "Your brief (paste this into Claude)", "Saved briefs"];
+  document.getElementById("stepName").textContent = names[step];
+  document.getElementById("bar").style.width = `${Math.min(step, BRIEF_STEP) / BRIEF_STEP * 100}%`;
+  document.getElementById("savedBtn").classList.toggle("hidden", step === SAVED_STEP);
+
+  if (step < BRIEF_STEP) STEPS[step].fields.forEach(f => main.append(renderField(f)));
+  else if (step === BRIEF_STEP) renderBrief();
+  else renderSaved();
+
+  backBtn.disabled = step === 0;
+  nextBtn.textContent = step === BRIEF_STEP - 1 ? "Build brief" : step < BRIEF_STEP ? "Next" : "Back to questions";
+  nextBtn.classList.toggle("hidden", step === BRIEF_STEP);
+}
+
+function go(n) {
+  if (step !== SAVED_STEP) lastStep = step;
+  step = n;
+  persist();
+  render();
+  window.scrollTo(0, 0);
+}
+
+function buildAndSave() {
+  const data = collect();
+  briefText = buildBrief(data);
+  const now = new Date();
+  saved.unshift({
+    topic: data.topic || "untitled",
+    date: now.toLocaleString([], { dateStyle: "medium", timeStyle: "short" }),
+    brief: briefText,
+  });
+  localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
+}
+
+function startOver() {
+  if (!confirm("Clear your answers and start a new hot take? Saved briefs are kept.")) return;
+  answers = {};
+  briefText = "";
+  go(0);
+}
+
+nextBtn.addEventListener("click", () => {
+  if (step === SAVED_STEP) return go(Math.min(lastStep, BRIEF_STEP - 1));
+  if (step === BRIEF_STEP - 1) buildAndSave();
+  go(step + 1);
+});
+backBtn.addEventListener("click", () => {
+  if (step === SAVED_STEP) return go(lastStep === BRIEF_STEP && !briefText ? BRIEF_STEP - 1 : lastStep);
+  if (step > 0) go(step - 1);
+});
+document.getElementById("savedBtn").addEventListener("click", () => go(SAVED_STEP));
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+render();
+</script>
+</body>
+</html>
